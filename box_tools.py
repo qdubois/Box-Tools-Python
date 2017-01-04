@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 from __future__ import print_function, unicode_literals
-import os, sys, timeit
+import os, sys, timeit, csv, io
 from boxsdk import Client
 from boxsdk.exception import BoxAPIException
 from boxsdk.object.collaboration import CollaborationRole
 from auth import authenticate
 
 FOLDER_PATH = 'download/' #define where you need the files to be stored
+files_list = []
 
 #Download file
 def download_the_file(client, file_name, file_id, separator='' ):
@@ -21,22 +22,24 @@ def download_the_file(client, file_name, file_id, separator='' ):
 	return separator + '   - File: ' + file_name + ' ' # + file_id
 
 #file info
-def get_file_info(client, file_name, file_id, separator='' ):
+def get_file_info(client, file_name, file_id, separator='',folder='' ):
+	files_list.append([folder,file_name])
+	#return separator + ';' + file_name + ' ' # + file_id
 	return separator + '   - File: ' + file_name + ' ' # + file_id
 
 #Scan recursively  & Download or Get file info
-def scan_folder_and_action(client, action, folder_id, separator=''):
+def scan_folder_and_action(client, action, folder_id, separator='', folder=''):
 	x_folder = client.folder(folder_id=folder_id).get()
 	items = x_folder.get_items(limit=500, offset=0)
 	for item in items:
 		if (item.type == 'folder' ):
 			print(separator + '  + Folder: ' + item.name + ' ')
-			scan_folder_and_action(client, action, item.id,separator + ' ' )
+			scan_folder_and_action(client, action, item.id,separator + ' ',folder + item.name + '/'  )
 		elif ( item.type == 'file' ):
 			if (action == 'download'):
 				print(download_the_file(client, item.name, item.id, separator))
 			elif (action == 'info'):
-				print(get_file_info(client, item.name, item.id, separator))
+				print(get_file_info(client, item.name, item.id, separator,folder))
 
 #main
 def main(argv):
@@ -60,7 +63,14 @@ def main(argv):
 		print('Start scanning & downloading folder:')
 		print('+ ' + searched_folder[0].name)
 		if (action_param == 'download' or  action_param == 'info'):
-			scan_folder_and_action(client, action_param, searched_folder[0].id)
+			scan_folder_and_action(client, action_param, searched_folder[0].id,'',searched_folder[0].name+'/')
+			if(action_param == 'info'):
+				filename= os.getcwd()+'/out.csv'
+				with io.open(filename,'w',encoding='utf8') as csv_out_file:
+					csv_out_file.write(u'folder,file_name'+'\n')
+					for file_item in files_list:
+						csv_out_file.write(u''+file_item[0]+';'+file_item[1]+'\n')
+					csv_out_file.close()
 		else:
 			print('Pameter error: action unrecognized (download or info)')
 	else:
